@@ -1,0 +1,17 @@
+(((edi <- 1) (call :alloc))
+(:alloc
+(esp -= 4)
+:begin
+(cjump edi < 10000 :cont :done)
+:cont
+(eax <- (allocate 3 1))
+((mem eax 4) <- eax)
+((mem ebp -4) <- eax)
+(edi += 2)
+(goto :begin)
+:done
+(esp += 4)
+(edi <- 1)
+(return)
+)
+)
