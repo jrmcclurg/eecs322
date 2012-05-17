@@ -17,13 +17,10 @@ void** heap;           // the current heap
 void** heap2;          // the heap for copying
 void** heap_temp;      // a pointer used for swapping heap/heap2
 void** allocptr;       // current allocation position
-int words_allocated=0; 
+int words_allocated=0;
 
 int *stack; // pointer to the bottom of the stack (i.e. value
             // upon program startup)
-
-#define MAX_ATTEMPTS 2
-int tries = 0; // number of attempts at allocation
 
 /*
  * Helper for the print() function
@@ -65,72 +62,46 @@ int print(void* l) {
  * Copies (compacts) an object from the old heap into
  * the empty heap
  */
-int *gc_copy(int *old) {
-   int size;
-   int i;
-   int *temp;
-   int *test;
-   void *the_new;
+int gc_copy( int old )  {
+    // If not a pointer or not a pointer to a heap location, return input value
+    if ( old % 4 != 0 || (void**)old < heap2 && (void**)old >= heap2 + HEAP_SIZE )
+        return old;
 
-   //printf("gc_copy(%p) mod = %d heap = %p - %p\n",old, (int)old % 4, heap2, heap2+HEAP_SIZE);
+    int * oldArray = (int *)old;
+    int size = oldArray[0];
 
-   // if the value actually references into the heap,
-   // we know it's a real pointer, since raw numeric
-   // values should ALWAYS have the least-significant-bit set
-   if((int)old % 4 == 0 && (void**)old >= heap2 && (void**)old < (heap2+HEAP_SIZE)) {
-      // get the size of the object
-      size = old[0];
-      // if this object has not already been copied...
-      if(old[size+1] == 0) {
-         // use the allocate function to update the
-         // heap allocation position
-         the_new = (void*)allocptr;
-         //the_new = allocate((size<<1)+1, (void*)0);
-         allocptr+=(size+2);
-         words_allocated+=(size+2);
-         old[size+1] = (int)the_new; // mark this object as copied
-         // go through the object's data, and recursively
-         // copy them into the empty heap
-         for(i = 1; i <= size; i++) {
-            temp = (int*)old[i];
-            test = gc_copy(temp);
-            if(test != 0) {
-               old[i] = (int)test;
-	       // TODO - just use the_new[i] here instead of old[i],
-               // and get rid of the memcpy
-            }
-         }
-         // actually copy the memory from old heap to new heap
-         memcpy(the_new,(void*)old,size+2);
-         return the_new;
-      } else {
-         // otherwise, if the object has been copied, just return its
-         // new address
-         return (int*)old[size+1];
-      }
-   } else {
-      return 0;
-   }
+    // If the size is negative, the array has already been copied to the
+    // new heap, so the first location of array will contain the new address
+    if ( size == -1 )
+        return oldArray[1];
+
+    // Mark the old array as invalid, create the new array
+    oldArray[0] = -1;
+    int * newArray = allocptr;
+    allocptr += size + 1;
+    words_allocated += size + 1;
+
+    // The value of oldArray[1] needs to be handled specially
+    int firstArrayLocation = oldArray[1];
+    oldArray[1] = (int)newArray;
+
+    // Set the values of newArray handling the first two locations separately
+    newArray[0] = size;
+    newArray[1] = gc_copy( firstArrayLocation );
+
+    // Call gc_copy on the remaining values of the array
+    for ( int i = 2; i <= size; i++ )
+        newArray[i] = gc_copy( oldArray[i] );
+
+    return (int)newArray;
 }
 
 /*
  * Initiates garbage collection
  */
-inline void gc() {
-   size_t i;
-   int *test;
-   int *esp;
-   size_t num;
-
-   // grab the esp (top-of-stack) register
-   asm ("movl %%esp, %0;"
-        :"=r"(esp)        /* output */
-        :         /* input */
-        :         /* clobbered register */
-   );  
-
+inline void gc( int * stackTop, int * calleeSaveRegisters ) {
    // calculate the stack size
-   num = (stack-sizeof(int*))-esp;
+   int stackSize = stack - sizeof(int*) - stackTop;
 
    //printf("Garbage collection: stack=%p, esp=%p, num=%d\n", stack, esp, num);
 
@@ -144,107 +115,68 @@ inline void gc() {
    allocptr = heap;
    words_allocated = 0;
 
-   #define NUM_REGISTERS 2 // 6
-   int *registers[NUM_REGISTERS];
+   // First, do the garbage collection on the callee save registers
+   calleeSaveRegisters[0] = gc_copy( &calleeSaveRegisters[0] );
+   calleeSaveRegisters[1] = gc_copy( &calleeSaveRegisters[1] );
 
-   // the callee-save registers might have roots, so we need to
-   // examine them (and possibly update the pointers)
-   asm ("movl %%edi, %0;"
-        "movl %%esi, %1;"
-        //"movl %%eax, %2;"
-        //"movl %%ebx, %3;"
-        //"movl %%ecx, %4;"
-        //"movl %%edx, %5;"
-        :"=r"(registers[0]), "=r"(registers[1])
-        // ,"=r"(registers[2]), "=r"(registers[3]), "=r"(registers[4]), "=r"(registers[5]) // outputs
-        :         // inputs (none)
-        :         // clobbered registers (none)
-   ); 
-
-   // anything pointed to by the registers
-   // gets copied into our empty heap
-   for(i = 0; i < NUM_REGISTERS; i++) {
-      test = gc_copy(registers[i]);
-      if(test != 0) {
-         registers[i] = test; // record the updated the pointer
-      }
-   }
-
-   // write any updated registers back
-   asm ("movl %0, %%edi;"
-        "movl %1, %%esi;"
-        //"movl %2, %%eax;"
-        //"movl %3, %%ebx;"
-        //"movl %4, %%ecx;"
-        //"movl %5, %%edx;"
-        :         // outputs (none)
-        :"r"(registers[0]), "r"(registers[1])
-        // ,"r"(registers[2]), "r"(registers[3]), "r"(registers[4]), "r"(registers[5]) // inputs
-        :"%edi","%esi"         // clobbered registers
-   );
-
-   // finally, we need to copy anything pointed at
+   // Then, we need to copy anything pointed at
    // by the stack into our empty heap
-   for(i = 0; i <= num; i++) {
-      //printf("   %d / %d = %p\n", i, num, esp[i]);
-      test = gc_copy((int*)esp[i]);
-      if(test != 0) {
-         esp[i] = (int)test; // update the stack
-      }
-   }
+   for( int i = 0; i <= stackSize; i++ )
+      stackTop[i] = gc_copy( stackTop[i] );
 }
 
 /*
  * The "allocate" runtime function
  */
-void* allocate(int fw_size, void *fw_fill) {
-   int size = fw_size >> 1;
-   void** ret;
-   int i;
+void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveRegisters )
+{
+    if ( !( fw_size & 1 ) ) {
+        printf("allocate called with size input that was not an encoded integer, %i\n",
+                fw_size);
+    }
 
-   //printf("allocate(%d,%p)\n",fw_size,fw_fill);
+    int dataSize = fw_size >> 1;
 
-   if (!(fw_size&1)) {
-      printf("allocate called with size input that was not an encoded integer, %i\n",
-             fw_size);
-   }
-   if (size < 0) {
-      printf("allocate called with size of %i\n",size);
-      exit(-1);
-   }
+    if ( dataSize < 0 ) {
+        printf("allocate called with size of %i\n",size);
+        exit(-1);
+    }
 
-   while(tries <= MAX_ATTEMPTS) {
-      //printf("Trying %d\n", tries);
-      size = fw_size >> 1;
-      ret = (void**)allocptr;
-      // we add a space at the the beginning for the list length,
-      // and a space at the end for the copying GC to store
-      // the updated pointer
-      allocptr+=(size+2);
-      words_allocated+=(size+2);
+    // Even if there is no data, allocate an array of two words
+    // so we can hold a forwarding pointer and an int representing if
+    // the array has already been garbage collected
+    int arraySize = ( dataSize == 0 ) ? 2 : dataSize + 1;
 
-      if (words_allocated < HEAP_SIZE) {
-        *((int*)ret)=size;     // store the length
-        ((int*)ret)[size+1] = (int*)0; // store a NULL value for the GC updated ptr
-        void** data = ret+1;
-        for (i=0;i<size;i++) {
-           *data = fw_fill;
-           data++;
+    // Check if the heap has space for the allocation
+    if ( words_allocated + dataSize < HEAP_SIZE )
+    {
+        // Garbage collect
+        gc();
+
+        // Check if the garbage collection free enough space for the allocation
+        if ( words_allocated + dataSize < HEAP_SIZE ) {
+            printf("out of memory");
+            exit(-1);
         }
-        tries = 0;
-        return ret;
-      }
+    }
 
-#ifdef ENABLE_GC
-      ++tries;
-      gc();
-#else
-      break;
-#endif
-   }
+    // Do the allocation
+    void * ret = allocptr;
+    allocptr += arraySize;
+    words_allocated += arraySize;
 
-   printf("out of memory");
-   exit(-1);
+    // Set the size of the array to be the desired size
+    ret[0] = dataSize;
+
+    // If there is no data, set the value of the array to be a number
+    // so it can be properly garbage collected
+    if ( dataSize == 0 )
+        ret[1] = 1;
+    else
+        // Fill the array with the fill value
+        memset( &ret[1], fw_fill, dataSize );
+
+    return ret;
 }
 
 /*
@@ -268,13 +200,13 @@ int main() {
       exit(-1);
    }
    allocptr = heap;
-   // TODO - set callee save here 
+   // TODO - set callee save here
    // move esp into the bottom-of-stack pointer
    asm ("movl %%esp, %0;"
         "call go;" // TODO this is broken (segfaults)
-      : "=r"(stack) // outputs
+      : "=m"(stack) // outputs
       :             // inputs (none)
       :             // clobbered registers (none)
-   );  
+   );
    return 0;
 }
