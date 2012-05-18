@@ -2,25 +2,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-// please don't remove the function prototypes for now!
-// it prevents annoying compile warnings
-extern void *allocate(int, void*);
-void *allocate_helper(int, void*, int*,int*,int*);
-int   print(void*);
-int   print_error(int*, int);
-void  print_content(void**, int);
-int  *gc_copy(int*);
-void  gc(int*,int*,int*);
-
 #define HEAP_SIZE 1048576  // one megabyte
-#define HEAP_SIZE 13       // small heap size for testing
-#define ENABLE_GC            // uncomment this to enable GC
+//#define HEAP_SIZE 10       // small heap size for testing
+#define ENABLE_GC          // uncomment this to enable GC
+//#define GC_DEBUG           // uncomment this to enable GC debugging
 
 void** heap;           // the current heap
 void** heap2;          // the heap for copying
 void** heap_temp;      // a pointer used for swapping heap/heap2
 
-int * allocptr;       // current allocation position
+int * allocptr;        // current allocation position
 static int words_allocated = 0;
 
 int *stack; // pointer to the bottom of the stack (i.e. value
@@ -30,8 +21,9 @@ int *stack; // pointer to the bottom of the stack (i.e. value
  * Helper for the print() function
  */
 void print_content(void** in, int depth) {
+   // TODO this function crashes quite messily if in is 0
    /*if(in == NULL) {
-      printf("x"); // TODO
+      printf("x");
       return;
    }*/
    if (depth >= 4) {
@@ -72,7 +64,7 @@ int print(void* l) {
  *
  * NOTE: this is a bit nit-picky, but the reason why I
  * feel like this should operate
- * on POINTERS not integers is... it's real goal is to
+ * on POINTERS not integers is... its real goal is to
  * copy ALLOCATED ARRAYS onto the new heap (i.e. it
  * doesn't really make sense to talk about moving
  * plain old numbers (ints) from heap to heap).
@@ -80,40 +72,40 @@ int print(void* l) {
 int *gc_copy( int *old )  {
    int i;
 
-    //printf("gc_copy(%p, %d) heap = %p to %p\n",old,old,heap2,heap2+HEAP_SIZE);
+   //printf("gc_copy(%p, %d) heap = %p to %p\n",old,old,heap2,heap2+HEAP_SIZE);
 
-    // If not a pointer or not a pointer to a heap location, return input value
-    if ( (int)old % 4 != 0 || (void**)old < heap2 || (void**)old >= heap2 + HEAP_SIZE ) {
-        return old;
-    }
+   // If not a pointer or not a pointer to a heap location, return input value
+   if ( (int)old % 4 != 0 || (void**)old < heap2 || (void**)old >= heap2 + HEAP_SIZE ) {
+       return old;
+   }
 
-    int * old_array = (int *)old;
-    int size = old_array[0];
+   int * old_array = (int *)old;
+   int size = old_array[0];
 
-    // If the size is negative, the array has already been copied to the
-    // new heap, so the first location of array will contain the new address
-    if ( size == -1 )
-        return (int*)old_array[1];
+   // If the size is negative, the array has already been copied to the
+   // new heap, so the first location of array will contain the new address
+   if ( size == -1 )
+       return (int*)old_array[1];
 
-    // Mark the old array as invalid, create the new array
-    old_array[0] = -1;
-    int * new_array = allocptr;
-    allocptr += (size + 1);
-    words_allocated += (size + 1);
+   // Mark the old array as invalid, create the new array
+   old_array[0] = -1;
+   int * new_array = allocptr;
+   allocptr += (size + 1);
+   words_allocated += (size + 1);
 
-    // The value of old_array[1] needs to be handled specially
-    int *first_array_location = (int*)old_array[1];
-    old_array[1] = (int)new_array;
+   // The value of old_array[1] needs to be handled specially
+   int *first_array_location = (int*)old_array[1];
+   old_array[1] = (int)new_array;
 
-    // Set the values of new_array handling the first two locations separately
-    new_array[0] = size;
-    new_array[1] = (int)gc_copy( first_array_location );
+   // Set the values of new_array handling the first two locations separately
+   new_array[0] = size;
+   new_array[1] = (int)gc_copy( first_array_location );
 
-    // Call gc_copy on the remaining values of the array
-    for (i = 2; i <= size; i++)
-        new_array[i] = (int)gc_copy( (int*)old_array[i] );
+   // Call gc_copy on the remaining values of the array
+   for (i = 2; i <= size; i++)
+       new_array[i] = (int)gc_copy( (int*)old_array[i] );
 
-    return new_array;
+   return new_array;
 }
 
 /*
@@ -124,7 +116,9 @@ void gc(int * esp, int *edi, int *esi) {
    // calculate the stack size
    int stack_size = stack - esp;
 
-   printf("Garbage collection: stack_size=%p, edi=%p, esi=%d\n", stack_size, *edi, *esi);
+#ifdef GC_DEBUG
+   printf("GC: stack=(%p,%p) (size %d), edi=%d, esi=%d\n", esp, stack, stack_size, *edi, *esi);
+#endif
 
    // swap in the empty heap to use for storing
    // compacted objects
@@ -137,9 +131,10 @@ void gc(int * esp, int *edi, int *esi) {
    words_allocated = 0;
 
 
-   // First, do the garbage collection on the callee save registers
-   *edi = (int)gc_copy( *edi );
-   *esi = (int)gc_copy( *esi );
+   // the VALUES of the edi/esi registers could be roots,
+   // so try to GC them
+   *edi = (int)gc_copy( (int*)*edi );
+   *esi = (int)gc_copy( (int*)*esi );
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
@@ -154,8 +149,8 @@ void gc(int * esp, int *edi, int *esi) {
  * allocate_helper function)
  */
 asm(
-   "   .globl	allocate\n"
-   "   .type	allocate, @function\n"
+   ".globl allocate\n"
+   ".type allocate, @function\n"
    "allocate:\n"
    "# grab the arguments (into eax,edx)\n"
    "popl %ecx\n"
@@ -170,10 +165,11 @@ asm(
    "movl %esp, %ecx\n"
    "# save the caller's base pointer (so that LEAVE works)\n"
    "push %ebp\n"
-   "movl %esp, %ebp\n"
    "# body begins with base and\n"
    "# stack pointers equal\n"
-   "# call the real alloc\n"
+   "movl %esp, %ebp\n"
+   "# put esi,edi in memory and push their addrs on stack\n"
+   "# these will be used as the last two args\n"
    "subl $8, %esp\n"
    "subl $4, %ebp\n"
    "movl %esi, (%ebp)\n"
@@ -182,12 +178,14 @@ asm(
    "movl %edi, (%ebp)\n"
    "pushl %ebp\n"
    "addl $8, %ebp\n"
+   "# push the first three args on stack\n"
    "pushl %ecx\n"
    "pushl %edx\n"
    "pushl %eax\n"
+   "# call the real alloc\n"
    "call allocate_helper\n"
-   "addl	$20, %esp\n"
-   "addl	$8, %esp\n"
+   "addl $20, %esp\n"
+   "addl $8, %esp\n"
    "\n"
    "leave\n"
    "ret\n" 
@@ -199,63 +197,63 @@ asm(
 void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi )
 {
    int i;
-    if ( !( fw_size & 1 ) ) {
-        printf("allocate called with size input that was not an encoded integer, %i\n",
-                fw_size);
-    }
+   if ( !( fw_size & 1 ) ) {
+      printf("allocate called with size input that was not an encoded integer, %i\n",
+             fw_size);
+   }
 
-    int dataSize = fw_size >> 1;
+   int dataSize = fw_size >> 1;
 
-    if ( dataSize < 0 ) {
-        printf( "allocate called with size of %i\n", dataSize );
-        exit( -1 );
-    }
+   if ( dataSize < 0 ) {
+      printf( "allocate called with size of %i\n", dataSize );
+      exit( -1 );
+   }
 
-    //printf("allocate_helper(%d,%d,%d,%d,%d) heap=%p heap2=%p allocptr=%p\n",fw_size,fw_fill,esp,edi,esi, heap, heap2, allocptr);
+   //printf("allocate_helper(%d,%d,%d,%d,%d) heap=%p heap2=%p allocptr=%p\n",fw_size,fw_fill,esp,edi,esi, heap, heap2, allocptr);
 
-    // Even if there is no data, allocate an array of two words
-    // so we can hold a forwarding pointer and an int representing if
-    // the array has already been garbage collected
-    int arraySize = ( dataSize == 0 ) ? 2 : dataSize + 1;
+   // Even if there is no data, allocate an array of two words
+   // so we can hold a forwarding pointer and an int representing if
+   // the array has already been garbage collected
+   int arraySize = ( dataSize == 0 ) ? 2 : dataSize + 1;
 
-    // Check if the heap has space for the allocation
-    if ( words_allocated + dataSize >= HEAP_SIZE )
-    {
+   // Check if the heap has space for the allocation
+   if ( words_allocated + dataSize >= HEAP_SIZE )
+   {
 #ifdef ENABLE_GC
-        // Garbage collect
-        gc(esp, edi, esi);
+      // Garbage collect
+      gc(esp, edi, esi);
 #endif
 
-        // Check if the garbage collection free enough space for the allocation
-        if ( words_allocated + dataSize >= HEAP_SIZE ) {
-            printf("out of memory");
-            exit(-1);
-        }
-    }
+      // Check if the garbage collection free enough space for the allocation
+      if ( words_allocated + dataSize >= HEAP_SIZE ) {
+         printf("out of memory");
+         exit(-1);
+      }
+   }
 
-    // Do the allocation
-    int * ret = allocptr;
-    allocptr += arraySize;
-    words_allocated += arraySize;
+   // Do the allocation
+   int * ret = allocptr;
+   allocptr += arraySize;
+   words_allocated += arraySize;
 
-    // Set the size of the array to be the desired size
-    ret[0] = dataSize;
+   // Set the size of the array to be the desired size
+   ret[0] = dataSize;
 
-    // If there is no data, set the value of the array to be a number
-    // so it can be properly garbage collected
-    if ( dataSize == 0 )
-        ret[1] = 1;
-    else {
-        // Fill the array with the fill value
-	// NOTE: memset was NOT working properly here
-	// (maybe because we need to copy WORDS
-	// rather than just bytes, not really sure)
-        for(i = 0; i < dataSize; i++) {
-	   ret[i+1] = (int)fw_fill;
-        }
-    }
+   // If there is no data, set the value of the array to be a number
+   // so it can be properly garbage collected
+   if ( dataSize == 0 ) {
+      ret[1] = 1;
+   } else {
+      // Fill the array with the fill value
+      // NOTE: memset was NOT working properly here
+      // (maybe because we need to copy WORDS
+      // rather than just bytes, not really sure)
+      for(i = 0; i < dataSize; i++) {
+         ret[i+1] = (int)fw_fill;
+      }
+   }
 
-    return ret;
+   return ret;
 }
 
 /*
@@ -263,7 +261,7 @@ void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi 
  */
 int print_error(int* array, int fw_x) {
    printf("attempted to use position %i in an array that only has %i positions\n",
-		 fw_x>>1, *array);
+      fw_x>>1, *array);
    exit(0);
 }
 
@@ -282,8 +280,9 @@ int main() {
       printf("malloc failed\n");
       exit(-1);
    }
-   printf("We're in main\n");
-   // TODO - set callee save here
+
+   //printf("We're in main\n");
+
    // move esp into the bottom-of-stack pointer
    // the "go" function's boilerplate (if copied correctly from the
    // lecture notes), in conjunction with the C calling convention
@@ -297,6 +296,7 @@ int main() {
       :             // inputs (none)
       : "%eax"      // clobbered registers (eax)
    );  
-   printf("Main got stack : %d\n", (int)stack);
+
+   //printf("Main got stack : %d\n", (int)stack);
    return 0;
 }

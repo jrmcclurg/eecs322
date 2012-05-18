@@ -1,0 +1,20 @@
+(( 
+   (edi <- 0)
+   (call :recur)
+   (eax <- (print 1))
+ )
+ (:recur
+    (cjump edi < 10 :cont :done)
+    :cont
+    (edi *= 2)
+    (edi += 1)
+    (eax <- (allocate edi edi))
+    (edi >>= 1)
+    (eax <- (print eax))
+    (edi += 1)
+    (call :recur)
+    (edi -= 1)
+    :done
+    (return)
+ )
+)
