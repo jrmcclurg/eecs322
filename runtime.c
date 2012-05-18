@@ -62,13 +62,6 @@ int print(void* l) {
  * Helper for the gc() function.
  * Copies (compacts) an object from the old heap into
  * the empty heap
- *
- * NOTE: this is a bit nit-picky, but the reason why I
- * feel like this should operate
- * on POINTERS not integers is... its real goal is to
- * copy ALLOCATED ARRAYS onto the new heap (i.e. it
- * doesn't really make sense to talk about moving
- * plain old numbers (ints) from heap to heap).
  */
 int *gc_copy(int *old)  {
    int i;
@@ -94,6 +87,7 @@ int *gc_copy(int *old)  {
    words_allocated += (size + 1);
 
    // The value of old_array[1] needs to be handled specially
+   // since it holds a pointer to the new heap object
    int *first_array_location = (int*)old_array[1];
    old_array[1] = (int)new_array;
 
@@ -103,7 +97,7 @@ int *gc_copy(int *old)  {
 
    // Call gc_copy on the remaining values of the array
    for (i = 2; i <= size; i++) {
-       new_array[i] = (int)gc_copy((int*)old_array[i]);
+      new_array[i] = (int)gc_copy((int*)old_array[i]);
    }
 
    return new_array;
@@ -112,14 +106,13 @@ int *gc_copy(int *old)  {
 /*
  * Initiates garbage collection
  */
-void gc(int *esp, int *edi, int *esi) {
+void gc(int *esp) {
    int i;
-   // calculate the stack size
-   int stack_size = stack - esp;
+   int stack_size = stack - esp;           // calculate the stack size
    int prev_words_alloc = words_allocated;
 
 #ifdef GC_DEBUG
-   printf("GC: stack=(%p,%p) (size %d), edi=%d, esi=%d: ", esp, stack, stack_size, *edi, *esi);
+   printf("GC: stack=(%p,%p) (size %d): ", esp, stack, stack_size);
 #endif
 
    // swap in the empty heap to use for storing
@@ -132,11 +125,10 @@ void gc(int *esp, int *edi, int *esi) {
    allocptr = (int *)heap;
    words_allocated = 0;
 
-
-   // the VALUES of the edi/esi registers could be root pointers,
-   // so try to GC them
-   *edi = (int)gc_copy((int*)*edi);
-   *esi = (int)gc_copy((int*)*esi);
+   // NOTE: the edi/esi register contents could also be
+   // roots, but these have been placed in the stack
+   // by the allocate() assembly function.  Thus,
+   // we only need to look at the stack at this point
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
@@ -168,40 +160,36 @@ asm(
    "pushl %edx\n"
    "pushl %eax\n"
    "pushl %ecx\n"
-   "# save the original esp (into ecx)\n"
-   "movl %esp, %ecx\n"
+   "# save the original edi/esi (into the stack)\n"
+   "pushl %edi\n"
+   "pushl %esi\n"
    "# save the caller's base pointer (so that LEAVE works)\n"
-   "push %ebp\n"
    "# body begins with base and\n"
    "# stack pointers equal\n"
+   "pushl %ebp\n"
    "movl %esp, %ebp\n"
-   "# put esi,edi in memory and push their addrs on stack\n"
-   "# these will be used as the last two args\n"
-   "subl $8, %esp\n"
-   "subl $4, %ebp\n"
-   "movl %esi, (%ebp)\n"
-   "pushl %ebp\n"
-   "subl $4, %ebp\n"
-   "movl %edi, (%ebp)\n"
-   "pushl %ebp\n"
-   "addl $8, %ebp\n"
+   "# save the original esp (into ecx)\n"
+   "movl %esp, %ecx\n"
    "# push the first three args on stack\n"
    "pushl %ecx\n"
    "pushl %edx\n"
    "pushl %eax\n"
    "# call the real alloc\n"
    "call allocate_helper\n"
-   "addl $20, %esp\n"
-   "addl $8, %esp\n"
+   "addl $12, %esp\n"
    "\n"
+   "# restores the original base pointer (from stack)\n"
    "leave\n"
+   "# restore the original edi/esi (from the stack)\n"
+   "popl %esi\n"
+   "popl %edi\n"
    "ret\n" 
 );
 
 /*
  * The "allocate" runtime function
  */
-void* allocate_helper(int fw_size, void *fw_fill, int *esp, int *edi, int *esi)
+void* allocate_helper(int fw_size, void *fw_fill, int *esp)
 {
    int i;
    if(!(fw_size & 1)) {
@@ -226,7 +214,7 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp, int *edi, int *esi)
    {
 #ifdef ENABLE_GC
       // Garbage collect
-      gc(esp, edi, esi);
+      gc(esp);
 #endif
 
       // Check if the garbage collection free enough space for the allocation
