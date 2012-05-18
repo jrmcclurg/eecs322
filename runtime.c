@@ -21,7 +21,7 @@ void** heap2;          // the heap for copying
 void** heap_temp;      // a pointer used for swapping heap/heap2
 
 int * allocptr;       // current allocation position
-int words_allocated = 0;
+static int words_allocated = 0;
 
 int *stack; // pointer to the bottom of the stack (i.e. value
             // upon program startup)
@@ -76,9 +76,12 @@ int print(void* l) {
 int *gc_copy( int *old )  {
    int i;
 
+    printf("gc_copy(%p, %d) heap = %p to %p\n",old,old,heap2,heap2+HEAP_SIZE);
+
     // If not a pointer or not a pointer to a heap location, return input value
-    if ( (int)old % 4 != 0 || (void**)old < heap2 && (void**)old >= heap2 + HEAP_SIZE )
+    if ( (int)old % 4 != 0 || (void**)old < heap2 || (void**)old >= heap2 + HEAP_SIZE ) {
         return old;
+    }
 
     int * old_array = (int *)old;
     int size = old_array[0];
@@ -129,9 +132,10 @@ void gc(int * esp, int *edi, int *esi) {
    allocptr = (int *)heap;
    words_allocated = 0;
 
+
    // First, do the garbage collection on the callee save registers
-   *edi = (int)gc_copy( edi );
-   *esi = (int)gc_copy( esi );
+   *edi = (int)gc_copy( *edi );
+   *esi = (int)gc_copy( *esi );
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
@@ -201,6 +205,8 @@ void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi 
         exit( -1 );
     }
 
+    printf("allocate_helper(%d,%d,%d,%d,%d):\n",fw_size,fw_fill,esp,edi,esi);
+
     // Even if there is no data, allocate an array of two words
     // so we can hold a forwarding pointer and an int representing if
     // the array has already been garbage collected
@@ -262,6 +268,7 @@ int main() {
       printf("malloc failed\n");
       exit(-1);
    }
+   printf("We're in main\n");
    // TODO - set callee save here
    // move esp into the bottom-of-stack pointer
    // the "go" function's boilerplate (if copied correctly from the
@@ -274,7 +281,7 @@ int main() {
         "call go;"
       : "=m"(stack) // outputs
       :             // inputs (none)
-      : "%eax"      // clobbered registers (none)
+      : "%eax"      // clobbered registers (eax)
    );  
    printf("Main got stack : %d\n", (int)stack);
    return 0;
