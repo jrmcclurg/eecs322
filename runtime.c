@@ -4,7 +4,7 @@
 
 #define HEAP_SIZE 1048576  // one megabyte
 //#define HEAP_SIZE 10       // small heap size for testing
-#define ENABLE_GC          // uncomment this to enable GC
+//#define ENABLE_GC          // uncomment this to enable GC
 //#define GC_DEBUG           // uncomment this to enable GC debugging
 
 void** heap;           // the current heap
@@ -21,13 +21,14 @@ int *stack; // pointer to the bottom of the stack (i.e. value
  * Helper for the print() function
  */
 void print_content(void** in, int depth) {
-   // TODO this function crashes quite messily if in is 0
-   /*if(in == NULL) {
-      printf("x");
-      return;
-   }*/
    if(depth >= 4) {
       printf("...");
+      return;
+   }
+   // TODO this function crashes quite messily if in is 0
+   // so hopefully it's okay to add this
+   if(in == NULL) {
+      printf("nil");
       return;
    }
    int x = (int) in;
@@ -84,8 +85,9 @@ int *gc_copy(int *old)  {
 
    // If the size is negative, the array has already been copied to the
    // new heap, so the first location of array will contain the new address
-   if(size == -1)
+   if(size == -1) {
        return (int*)old_array[1];
+   }
 
    // Mark the old array as invalid, create the new array
    old_array[0] = -1;
@@ -102,8 +104,9 @@ int *gc_copy(int *old)  {
    new_array[1] = (int)gc_copy(first_array_location);
 
    // Call gc_copy on the remaining values of the array
-   for (i = 2; i <= size; i++)
+   for (i = 2; i <= size; i++) {
        new_array[i] = (int)gc_copy((int*)old_array[i]);
+   }
 
    return new_array;
 }
@@ -227,7 +230,7 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp, int *edi, int *esi)
 
       // Check if the garbage collection free enough space for the allocation
       if(words_allocated + dataSize >= HEAP_SIZE) {
-         printf("out of memory");
+         printf("out of memory\n"); // TODO hopefully it's okay to add the newline
          exit(-1);
       }
    }
