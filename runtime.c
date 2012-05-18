@@ -26,12 +26,12 @@ void print_content(void** in, int depth) {
       printf("x");
       return;
    }*/
-   if (depth >= 4) {
+   if(depth >= 4) {
       printf("...");
       return;
    }
    int x = (int) in;
-   if (x&1) {
+   if(x&1) {
       printf("%i",x>>1);
    } else {
       int size= *((int*)in);
@@ -69,13 +69,13 @@ int print(void* l) {
  * doesn't really make sense to talk about moving
  * plain old numbers (ints) from heap to heap).
  */
-int *gc_copy( int *old )  {
+int *gc_copy(int *old)  {
    int i;
 
    //printf("gc_copy(%p, %d) heap = %p to %p\n",old,old,heap2,heap2+HEAP_SIZE);
 
    // If not a pointer or not a pointer to a heap location, return input value
-   if ( (int)old % 4 != 0 || (void**)old < heap2 || (void**)old >= heap2 + HEAP_SIZE ) {
+   if((int)old % 4 != 0 || (void**)old < heap2 || (void**)old >= heap2 + HEAP_SIZE) {
        return old;
    }
 
@@ -84,7 +84,7 @@ int *gc_copy( int *old )  {
 
    // If the size is negative, the array has already been copied to the
    // new heap, so the first location of array will contain the new address
-   if ( size == -1 )
+   if(size == -1)
        return (int*)old_array[1];
 
    // Mark the old array as invalid, create the new array
@@ -99,11 +99,11 @@ int *gc_copy( int *old )  {
 
    // Set the values of new_array handling the first two locations separately
    new_array[0] = size;
-   new_array[1] = (int)gc_copy( first_array_location );
+   new_array[1] = (int)gc_copy(first_array_location);
 
    // Call gc_copy on the remaining values of the array
    for (i = 2; i <= size; i++)
-       new_array[i] = (int)gc_copy( (int*)old_array[i] );
+       new_array[i] = (int)gc_copy((int*)old_array[i]);
 
    return new_array;
 }
@@ -111,7 +111,7 @@ int *gc_copy( int *old )  {
 /*
  * Initiates garbage collection
  */
-void gc(int * esp, int *edi, int *esi) {
+void gc(int *esp, int *edi, int *esi) {
    int i;
    // calculate the stack size
    int stack_size = stack - esp;
@@ -131,15 +131,15 @@ void gc(int * esp, int *edi, int *esi) {
    words_allocated = 0;
 
 
-   // the VALUES of the edi/esi registers could be roots,
+   // the VALUES of the edi/esi registers could be root pointers,
    // so try to GC them
-   *edi = (int)gc_copy( (int*)*edi );
-   *esi = (int)gc_copy( (int*)*esi );
+   *edi = (int)gc_copy((int*)*edi);
+   *esi = (int)gc_copy((int*)*esi);
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
-   for( i = 0; i <= stack_size; i++ ) {
-      esp[i] = (int)gc_copy( (int*)esp[i] );
+   for(i = 0; i <= stack_size; i++) {
+      esp[i] = (int)gc_copy((int*)esp[i]);
    }
 }
 
@@ -148,6 +148,7 @@ void gc(int * esp, int *edi, int *esi) {
  * (assembly stub that calls the 5-argument
  * allocate_helper function)
  */
+extern void* allocate(int fw_size, void *fw_fill);
 asm(
    ".globl allocate\n"
    ".type allocate, @function\n"
@@ -194,19 +195,19 @@ asm(
 /*
  * The "allocate" runtime function
  */
-void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi )
+void* allocate_helper(int fw_size, void *fw_fill, int *esp, int *edi, int *esi)
 {
    int i;
-   if ( !( fw_size & 1 ) ) {
+   if(!(fw_size & 1)) {
       printf("allocate called with size input that was not an encoded integer, %i\n",
              fw_size);
    }
 
    int dataSize = fw_size >> 1;
 
-   if ( dataSize < 0 ) {
-      printf( "allocate called with size of %i\n", dataSize );
-      exit( -1 );
+   if(dataSize < 0) {
+      printf("allocate called with size of %i\n", dataSize);
+      exit(-1);
    }
 
    //printf("allocate_helper(%d,%d,%d,%d,%d) heap=%p heap2=%p allocptr=%p\n",fw_size,fw_fill,esp,edi,esi, heap, heap2, allocptr);
@@ -214,10 +215,10 @@ void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi 
    // Even if there is no data, allocate an array of two words
    // so we can hold a forwarding pointer and an int representing if
    // the array has already been garbage collected
-   int arraySize = ( dataSize == 0 ) ? 2 : dataSize + 1;
+   int arraySize = (dataSize == 0) ? 2 : dataSize + 1;
 
    // Check if the heap has space for the allocation
-   if ( words_allocated + dataSize >= HEAP_SIZE )
+   if(words_allocated + dataSize >= HEAP_SIZE)
    {
 #ifdef ENABLE_GC
       // Garbage collect
@@ -225,14 +226,14 @@ void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi 
 #endif
 
       // Check if the garbage collection free enough space for the allocation
-      if ( words_allocated + dataSize >= HEAP_SIZE ) {
+      if(words_allocated + dataSize >= HEAP_SIZE) {
          printf("out of memory");
          exit(-1);
       }
    }
 
    // Do the allocation
-   int * ret = allocptr;
+   int *ret = allocptr;
    allocptr += arraySize;
    words_allocated += arraySize;
 
@@ -241,7 +242,7 @@ void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi 
 
    // If there is no data, set the value of the array to be a number
    // so it can be properly garbage collected
-   if ( dataSize == 0 ) {
+   if(dataSize == 0) {
       ret[1] = 1;
    } else {
       // Fill the array with the fill value
@@ -276,7 +277,7 @@ int main() {
    // NOTE: allocptr needs to appear in the following check, because otherwise
    // gcc apparently optimizes away the assignment (i.e. the allocate_helper function
    // sees allocptr as NULL)
-   if (!allocptr || !heap2) {
+   if(!allocptr || !heap2) {
       printf("malloc failed\n");
       exit(-1);
    }
@@ -284,10 +285,11 @@ int main() {
    //printf("We're in main\n");
 
    // move esp into the bottom-of-stack pointer
-   // the "go" function's boilerplate (if copied correctly from the
-   // lecture notes), in conjunction with the C calling convention
-   // dictates that there will be exactly 6 words added to the
-   // stack before the body of "go" actually happens
+   // the "go" function's boilerplate (as long as one copies it
+   // correctly from the lecture notes), in conjunction with
+   // the C calling convention dictates that there will be
+   // exactly 6 words added to the stack before the
+   // body of "go" actually happens
    asm ("movl %%esp, %%eax;"
         "subl $24, %%eax;" // 6 * 4
         "movl %%eax, %0;"
