@@ -10,7 +10,7 @@ int   print(void*);
 int   print_error(int*, int);
 void  print_content(void**, int);
 int  *gc_copy(int*);
-void  gc(int *esp);
+void  gc(int*,int*,int*);
 
 #define HEAP_SIZE 1048576  // one megabyte
 //#define HEAP_SIZE 50       // small heap size for testing
@@ -65,45 +65,55 @@ int print(void* l) {
  * Helper for the gc() function.
  * Copies (compacts) an object from the old heap into
  * the empty heap
+ *
+ * NOTE: this is a bit nit-picky, but the reason why I
+ * feel like this should operate
+ * on POINTERS not integers is... it's real goal is to
+ * copy ALLOCATED ARRAYS onto the new heap (i.e. it
+ * doesn't really make sense to talk about moving
+ * plain old numbers (ints) from heap to heap).
  */
-int gc_copy( int *old )  {
+int *gc_copy( int *old )  {
+   int i;
+
     // If not a pointer or not a pointer to a heap location, return input value
-    if ( old % 4 != 0 || (void**)old < heap2 && (void**)old >= heap2 + HEAP_SIZE )
+    if ( (int)old % 4 != 0 || (void**)old < heap2 && (void**)old >= heap2 + HEAP_SIZE )
         return old;
 
-    int * oldArray = (int *)old;
-    int size = oldArray[0];
+    int * old_array = (int *)old;
+    int size = old_array[0];
 
     // If the size is negative, the array has already been copied to the
     // new heap, so the first location of array will contain the new address
     if ( size == -1 )
-        return oldArray[1];
+        return (int*)old_array[1];
 
     // Mark the old array as invalid, create the new array
-    oldArray[0] = -1;
-    int * newArray = allocptr;
+    old_array[0] = -1;
+    int * new_array = allocptr;
     allocptr += size + 1;
     words_allocated += size + 1;
 
-    // The value of oldArray[1] needs to be handled specially
-    int firstArrayLocation = oldArray[1];
-    oldArray[1] = (int)newArray;
+    // The value of old_array[1] needs to be handled specially
+    int *first_array_location = (int*)old_array[1];
+    old_array[1] = (int)new_array;
 
-    // Set the values of newArray handling the first two locations separately
-    newArray[0] = size;
-    newArray[1] = gc_copy( firstArrayLocation );
+    // Set the values of new_array handling the first two locations separately
+    new_array[0] = size;
+    new_array[1] = (int)gc_copy( first_array_location );
 
     // Call gc_copy on the remaining values of the array
-    for ( int i = 2; i <= size; i++ )
-        newArray[i] = gc_copy( oldArray[i] );
+    for (i = 2; i <= size; i++)
+        new_array[i] = (int)gc_copy( (int*)old_array[i] );
 
-    return (int)newArray;
+    return new_array;
 }
 
 /*
  * Initiates garbage collection
  */
-inline void gc(int * esp, int *edi, int *esi) {
+void gc(int * esp, int *edi, int *esi) {
+   int i;
    // calculate the stack size
    int stack_size = stack - esp;
 
@@ -120,13 +130,13 @@ inline void gc(int * esp, int *edi, int *esi) {
    words_allocated = 0;
 
    // First, do the garbage collection on the callee save registers
-   *edi = gc_copy( edi );
-   *esi = gc_copy( esi );
+   *edi = (int)gc_copy( edi );
+   *esi = (int)gc_copy( esi );
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
-   for( int i = 0; i <= stack_size; i++ )
-      esp[i] = gc_copy( esp[i] );
+   for( i = 0; i <= stack_size; i++ )
+      esp[i] = (int)gc_copy( (int*)esp[i] );
 }
 
 /*
@@ -244,7 +254,7 @@ int main() {
 
    heap = (void*)malloc(HEAP_SIZE*sizeof(void*));
    heap2 = (void*)malloc(HEAP_SIZE*sizeof(void*));
-   allocptr = heap;
+   allocptr = (int*)heap;
    // NOTE: allocptr needs to appear in the following check, because otherwise
    // gcc apparently optimizes away the assignment (i.e. the allocate_helper function
    // sees allocptr as NULL)
@@ -266,6 +276,6 @@ int main() {
       :             // inputs (none)
       : "%eax"      // clobbered registers (none)
    );  
-   printf("Main got stack : %d\n", stack);
+   printf("Main got stack : %d\n", (int)stack);
    return 0;
 }
