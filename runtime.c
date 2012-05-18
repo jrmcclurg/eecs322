@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-//#define HEAP_SIZE 1048576  // one megabyte
-#define HEAP_SIZE 10       // small heap size for testing
+#define HEAP_SIZE 1048576  // one megabyte
+//#define HEAP_SIZE 10       // small heap size for testing
 #define ENABLE_GC          // uncomment this to enable GC
-#define GC_DEBUG           // uncomment this to enable GC debugging
+//#define GC_DEBUG           // uncomment this to enable GC debugging
 
 void** heap;           // the current heap
 void** heap2;          // the heap for copying
