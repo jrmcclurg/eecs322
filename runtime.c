@@ -213,13 +213,13 @@ void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi 
     int arraySize = ( dataSize == 0 ) ? 2 : dataSize + 1;
 
     // Check if the heap has space for the allocation
-    if ( words_allocated + dataSize < HEAP_SIZE )
+    if ( words_allocated + dataSize >= HEAP_SIZE )
     {
         // Garbage collect
         gc(esp, edi, esi);
 
         // Check if the garbage collection free enough space for the allocation
-        if ( words_allocated + dataSize < HEAP_SIZE ) {
+        if ( words_allocated + dataSize >= HEAP_SIZE ) {
             printf("out of memory");
             exit(-1);
         }
