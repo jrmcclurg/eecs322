@@ -227,18 +227,28 @@ int main() {
 
    heap = (void*)malloc(HEAP_SIZE*sizeof(void*));
    heap2 = (void*)malloc(HEAP_SIZE*sizeof(void*));
-   if (!heap || !heap2) {
+   allocptr = heap;
+   // NOTE: allocptr needs to appear in the following check, because otherwise
+   // gcc apparently optimizes away the assignment (i.e. the allocate_helper function
+   // sees allocptr as NULL)
+   if (!allocptr || !heap2) {
       printf("malloc failed\n");
       exit(-1);
    }
-   allocptr = heap;
    // TODO - set callee save here
    // move esp into the bottom-of-stack pointer
-   asm ("movl %%esp, %0;"
-        "call go;" // TODO this is broken (segfaults)
+   // the "go" function's boilerplate (if copied correctly from the
+   // lecture notes), in conjunction with the C calling convention
+   // dictates that there will be exactly 6 words added to the
+   // stack before the body of "go" actually happens
+   asm ("movl %%esp, %%eax;"
+        "subl $24, %%eax;" // 6 * 4
+        "movl %%eax, %0;"
+        "call go;"
       : "=m"(stack) // outputs
       :             // inputs (none)
-      :             // clobbered registers (none)
-   );
+      : "%eax"      // clobbered registers (none)
+   );  
+   printf("Main got stack : %d\n", stack);
    return 0;
 }
