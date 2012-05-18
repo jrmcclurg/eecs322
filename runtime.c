@@ -1,13 +1,6 @@
-#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-void *allocate(int, void*);
-int   print(void*);
-int   print_error(int*, int);
-void  print_content(void**, int);
-int  *gc_copy(int*);
-void  gc();
+#include <stdio.h>
 
 #define HEAP_SIZE 1048576  // one megabyte
 //#define HEAP_SIZE 50       // small heap size for testing
@@ -16,8 +9,9 @@ void  gc();
 void** heap;           // the current heap
 void** heap2;          // the heap for copying
 void** heap_temp;      // a pointer used for swapping heap/heap2
-void** allocptr;       // current allocation position
-int words_allocated=0;
+
+int * allocptr;       // current allocation position
+int words_allocated = 0;
 
 int *stack; // pointer to the bottom of the stack (i.e. value
             // upon program startup)
@@ -112,12 +106,12 @@ inline void gc( int * stackTop, int * calleeSaveRegisters ) {
    heap2 = heap_temp;
 
    // reset heap position
-   allocptr = heap;
+   allocptr = (int *)heap;
    words_allocated = 0;
 
    // First, do the garbage collection on the callee save registers
-   calleeSaveRegisters[0] = gc_copy( &calleeSaveRegisters[0] );
-   calleeSaveRegisters[1] = gc_copy( &calleeSaveRegisters[1] );
+   calleeSaveRegisters[0] = gc_copy( calleeSaveRegisters[0] );
+   calleeSaveRegisters[1] = gc_copy( calleeSaveRegisters[1] );
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
@@ -138,8 +132,8 @@ void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveR
     int dataSize = fw_size >> 1;
 
     if ( dataSize < 0 ) {
-        printf("allocate called with size of %i\n",size);
-        exit(-1);
+        printf( "allocate called with size of %i\n", dataSize );
+        exit( -1 );
     }
 
     // Even if there is no data, allocate an array of two words
@@ -151,7 +145,7 @@ void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveR
     if ( words_allocated + dataSize < HEAP_SIZE )
     {
         // Garbage collect
-        gc();
+        gc( stackTop, calleeSaveRegisters );
 
         // Check if the garbage collection free enough space for the allocation
         if ( words_allocated + dataSize < HEAP_SIZE ) {
@@ -161,7 +155,7 @@ void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveR
     }
 
     // Do the allocation
-    void * ret = allocptr;
+    int * ret = allocptr;
     allocptr += arraySize;
     words_allocated += arraySize;
 
@@ -174,7 +168,7 @@ void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveR
         ret[1] = 1;
     else
         // Fill the array with the fill value
-        memset( &ret[1], fw_fill, dataSize );
+        memset( &ret[1], (int)fw_fill, dataSize );
 
     return ret;
 }
