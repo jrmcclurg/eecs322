@@ -13,8 +13,8 @@ int  *gc_copy(int*);
 void  gc(int*,int*,int*);
 
 #define HEAP_SIZE 1048576  // one megabyte
-//#define HEAP_SIZE 50       // small heap size for testing
-#define ENABLE_GC            // uncomment this to enable GC
+#define HEAP_SIZE 50       // small heap size for testing
+//#define ENABLE_GC            // uncomment this to enable GC
 
 void** heap;           // the current heap
 void** heap2;          // the heap for copying
@@ -76,7 +76,7 @@ int print(void* l) {
 int *gc_copy( int *old )  {
    int i;
 
-    printf("gc_copy(%p, %d) heap = %p to %p\n",old,old,heap2,heap2+HEAP_SIZE);
+    //printf("gc_copy(%p, %d) heap = %p to %p\n",old,old,heap2,heap2+HEAP_SIZE);
 
     // If not a pointer or not a pointer to a heap location, return input value
     if ( (int)old % 4 != 0 || (void**)old < heap2 || (void**)old >= heap2 + HEAP_SIZE ) {
@@ -120,7 +120,7 @@ void gc(int * esp, int *edi, int *esi) {
    // calculate the stack size
    int stack_size = stack - esp;
 
-   //printf("Garbage collection: stack=%p, esp=%p, num=%d\n", stack, esp, num);
+   printf("Garbage collection: stack_size=%p, edi=%p, esi=%d\n", stack_size, *edi, *esi);
 
    // swap in the empty heap to use for storing
    // compacted objects
@@ -205,7 +205,7 @@ void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi 
         exit( -1 );
     }
 
-    printf("allocate_helper(%d,%d,%d,%d,%d):\n",fw_size,fw_fill,esp,edi,esi);
+    //printf("allocate_helper(%d,%d,%d,%d,%d):\n",fw_size,fw_fill,esp,edi,esi);
 
     // Even if there is no data, allocate an array of two words
     // so we can hold a forwarding pointer and an int representing if
