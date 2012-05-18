@@ -121,6 +121,44 @@ inline void gc( int * stackTop, int * calleeSaveRegisters ) {
 
 /*
  * The "allocate" runtime function
+ * (assembly stub that calls the 5-argument
+ * allocate_helper function)
+ */
+asm(
+   "   .globl	allocate\n"
+   "   .type	allocate, @function\n"
+   "allocate:\n"
+   "# grab the arguments (into eax,edx)\n"
+   "popl %ecx\n"
+   "popl %eax\n"
+   "popl %edx\n"
+   "\n"
+   "# (put them back on stack)\n"
+   "pushl %edx\n"
+   "pushl %eax\n"
+   "pushl %ecx\n"
+   "# save the original esp (into ecx)\n"
+   "movl %esp, %ecx\n"
+   "# save the caller's base pointer (so that LEAVE works)\n"
+   "push %ebp\n"
+   "movl %esp, %ebp\n"
+   "# body begins with base and\n"
+   "# stack pointers equal\n"
+   "# call the real alloc\n"
+   "pushl %esi\n"
+   "pushl %edi\n"
+   "pushl %ecx\n"
+   "pushl %edx\n"
+   "pushl %eax\n"
+   "call allocate_helper\n"
+   "addl	$20, %esp\n"
+   "\n"
+   "leave\n"
+   "ret\n" 
+);
+
+/*
+ * The "allocate" runtime function
  */
 void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveRegisters )
 {
