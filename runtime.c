@@ -2,6 +2,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// please don't remove the function prototypes for now!
+// it prevents annoying compile warnings
+extern void *allocate(int, void*);
+void *allocate_helper(int, void*, int*,int*,int*);
+int   print(void*);
+int   print_error(int*, int);
+void  print_content(void**, int);
+int  *gc_copy(int*);
+void  gc(int *esp);
+
 #define HEAP_SIZE 1048576  // one megabyte
 //#define HEAP_SIZE 50       // small heap size for testing
 #define ENABLE_GC            // uncomment this to enable GC
@@ -56,7 +66,7 @@ int print(void* l) {
  * Copies (compacts) an object from the old heap into
  * the empty heap
  */
-int gc_copy( int old )  {
+int gc_copy( int *old )  {
     // If not a pointer or not a pointer to a heap location, return input value
     if ( old % 4 != 0 || (void**)old < heap2 && (void**)old >= heap2 + HEAP_SIZE )
         return old;
@@ -93,9 +103,9 @@ int gc_copy( int old )  {
 /*
  * Initiates garbage collection
  */
-inline void gc( int * stackTop, int * calleeSaveRegisters ) {
+inline void gc(int * esp, int *edi, int *esi) {
    // calculate the stack size
-   int stackSize = stack - sizeof(int*) - stackTop;
+   int stack_size = stack - esp;
 
    //printf("Garbage collection: stack=%p, esp=%p, num=%d\n", stack, esp, num);
 
@@ -110,13 +120,13 @@ inline void gc( int * stackTop, int * calleeSaveRegisters ) {
    words_allocated = 0;
 
    // First, do the garbage collection on the callee save registers
-   calleeSaveRegisters[0] = gc_copy( calleeSaveRegisters[0] );
-   calleeSaveRegisters[1] = gc_copy( calleeSaveRegisters[1] );
+   *edi = gc_copy( edi );
+   *esi = gc_copy( esi );
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
-   for( int i = 0; i <= stackSize; i++ )
-      stackTop[i] = gc_copy( stackTop[i] );
+   for( int i = 0; i <= stack_size; i++ )
+      esp[i] = gc_copy( esp[i] );
 }
 
 /*
@@ -145,13 +155,20 @@ asm(
    "# body begins with base and\n"
    "# stack pointers equal\n"
    "# call the real alloc\n"
-   "pushl %esi\n"
-   "pushl %edi\n"
+   "subl $8, %esp\n"
+   "subl $4, %ebp\n"
+   "movl %esi, (%ebp)\n"
+   "pushl %ebp\n"
+   "subl $4, %ebp\n"
+   "movl %edi, (%ebp)\n"
+   "pushl %ebp\n"
+   "addl $8, %ebp\n"
    "pushl %ecx\n"
    "pushl %edx\n"
    "pushl %eax\n"
    "call allocate_helper\n"
    "addl	$20, %esp\n"
+   "addl	$8, %esp\n"
    "\n"
    "leave\n"
    "ret\n" 
@@ -160,7 +177,7 @@ asm(
 /*
  * The "allocate" runtime function
  */
-void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveRegisters )
+void* allocate_helper( int fw_size, void *fw_fill, int *esp, int *edi, int *esi )
 {
     if ( !( fw_size & 1 ) ) {
         printf("allocate called with size input that was not an encoded integer, %i\n",
@@ -183,7 +200,7 @@ void* allocate_gc( int fw_size, void *fw_fill, int * stackTop, int * calleeSaveR
     if ( words_allocated + dataSize < HEAP_SIZE )
     {
         // Garbage collect
-        gc( stackTop, calleeSaveRegisters );
+        gc(esp, edi, esi);
 
         // Check if the garbage collection free enough space for the allocation
         if ( words_allocated + dataSize < HEAP_SIZE ) {
