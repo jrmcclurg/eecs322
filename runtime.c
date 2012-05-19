@@ -7,11 +7,11 @@
 #define ENABLE_GC          // uncomment this to enable GC
 //#define GC_DEBUG           // uncomment this to enable GC debugging
 
-void** heap;           // the current heap
-void** heap2;          // the heap for copying
-void** heap_temp;      // a pointer used for swapping heap/heap2
+void **heap;      // the current heap
+void **heap2;     // the heap for copying
+void **heap_temp; // a pointer used for swapping heap/heap2
 
-int * allocptr;        // current allocation position
+int *allocptr;           // current allocation position
 int words_allocated = 0;
 
 int *stack; // pointer to the bottom of the stack (i.e. value
@@ -20,7 +20,10 @@ int *stack; // pointer to the bottom of the stack (i.e. value
 /*
  * Helper for the print() function
  */
-void print_content(void** in, int depth) {
+void print_content(void **in, int depth) {
+   int i, x, size;
+   void **data;
+
    if(depth >= 4) {
       printf("...");
       return;
@@ -31,17 +34,16 @@ void print_content(void** in, int depth) {
       printf("nil");
       return;
    }
-   int x = (int) in;
-   if(x&1) {
-      printf("%i",x>>1);
+   x = (int)in;
+   if(x & 1) {
+      printf("%i", x >> 1);
    } else {
-      int size= *((int*)in);
-      void** data = in+1;
-      int i;
+      size= *((int*)in);
+      data = in+1;
       printf("{s:%i", size);
-      for (i=0;i<size;i++) {
+      for(i=0; i < size; i++) {
          printf(", ");
-         print_content(*data,depth+1);
+         print_content(*data, depth+1);
          data++;
       }
       printf("}");
@@ -51,8 +53,8 @@ void print_content(void** in, int depth) {
 /*
  * Runtime "print" function
  */
-int print(void* l) {
-   print_content(l,0);
+int print(void *l) {
+   print_content(l, 0);
    printf("\n");
 
    return 1;
@@ -64,15 +66,16 @@ int print(void* l) {
  * the empty heap
  */
 int *gc_copy(int *old)  {
-   int i;
+   int i, size;
+   int *old_array, *new_array, *first_array_location;
 
    // If not a pointer or not a pointer to a heap location, return input value
    if((int)old % 4 != 0 || (void**)old < heap2 || (void**)old >= heap2 + HEAP_SIZE) {
        return old;
    }
 
-   int * old_array = (int *)old;
-   int size = old_array[0];
+   old_array = (int*)old;
+   size = old_array[0];
 
    // If the size is negative, the array has already been copied to the
    // new heap, so the first location of array will contain the new address
@@ -82,13 +85,13 @@ int *gc_copy(int *old)  {
 
    // Mark the old array as invalid, create the new array
    old_array[0] = -1;
-   int * new_array = allocptr;
+   new_array = allocptr;
    allocptr += (size + 1);
    words_allocated += (size + 1);
 
    // The value of old_array[1] needs to be handled specially
    // since it holds a pointer to the new heap object
-   int *first_array_location = (int*)old_array[1];
+   first_array_location = (int*)old_array[1];
    old_array[1] = (int)new_array;
 
    // Set the values of new_array handling the first two locations separately
@@ -108,7 +111,7 @@ int *gc_copy(int *old)  {
  */
 void gc(int *esp) {
    int i;
-   int stack_size = stack - esp + 1;           // calculate the stack size
+   int stack_size = stack - esp + 1;       // calculate the stack size
    int prev_words_alloc = words_allocated;
 
 #ifdef GC_DEBUG
@@ -122,7 +125,7 @@ void gc(int *esp) {
    heap2 = heap_temp;
 
    // reset heap position
-   allocptr = (int *)heap;
+   allocptr = (int*)heap;
    words_allocated = 0;
 
    // NOTE: the edi/esi register contents could also be
@@ -139,14 +142,6 @@ void gc(int *esp) {
 #ifdef GC_DEBUG
    printf("reclaimed %d words\n", (prev_words_alloc - words_allocated));
 #endif
-}
-
-int c_test(char *one, char *two) {
-   char buffer[128];
-   strcpy(buffer,one);
-   strcat(buffer,two);
-   int result = strlen(buffer);
-   return result;
 }
 
 /*
@@ -201,17 +196,21 @@ asm(
 );
 
 /*
- * The "allocate" runtime function
+ * The real "allocate" runtime function
+ * (called by the above assembly stub function)
  */
 void* allocate_helper(int fw_size, void *fw_fill, int *esp)
 {
-   int i;
+   int i, data_size, array_size;
+   int *ret;
+
    if(!(fw_size & 1)) {
       printf("allocate called with size input that was not an encoded integer, %i\n",
              fw_size);
+      exit(-1);
    }
 
-   int data_size = fw_size >> 1;
+   data_size = fw_size >> 1;
 
    if(data_size < 0) {
       printf("allocate called with size of %i\n", data_size);
@@ -221,7 +220,7 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
    // Even if there is no data, allocate an array of two words
    // so we can hold a forwarding pointer and an int representing if
    // the array has already been garbage collected
-   int array_size = (data_size == 0) ? 2 : data_size + 1;
+   array_size = (data_size == 0) ? 2 : data_size + 1;
 
    // Check if the heap has space for the allocation
    if(words_allocated + data_size >= HEAP_SIZE)
@@ -241,7 +240,7 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
    }
 
    // Do the allocation
-   int *ret = allocptr;
+   ret = allocptr;
    allocptr += array_size;
    words_allocated += array_size;
 
@@ -265,9 +264,9 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
 /*
  * The "print-error" runtime function
  */
-int print_error(int* array, int fw_x) {
+int print_error(int *array, int fw_x) {
    printf("attempted to use position %i in an array that only has %i positions\n",
-      fw_x>>1, *array);
+          fw_x >> 1, *array);
    exit(0);
 }
 
@@ -275,8 +274,8 @@ int print_error(int* array, int fw_x) {
  * Program entry-point
  */
 int main() {
-   heap = (void*)malloc(HEAP_SIZE*sizeof(void*));
-   heap2 = (void*)malloc(HEAP_SIZE*sizeof(void*));
+   heap  = (void*)malloc(HEAP_SIZE * sizeof(void*));
+   heap2 = (void*)malloc(HEAP_SIZE * sizeof(void*));
    allocptr = (int*)heap;
    // NOTE: allocptr needs to appear in the following check, because otherwise
    // gcc apparently optimizes away the assignment (i.e. the allocate_helper function
