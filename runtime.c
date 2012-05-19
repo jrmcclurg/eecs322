@@ -155,20 +155,21 @@ asm(
    "popl %ecx\n"
    "popl %eax\n"
    "popl %edx\n"
-   "\n"
-   "# (put them back on stack)\n"
+   "# put non-GC values back in their place\n"
    "pushl $1\n" // edx
-   //"pushl $1\n" // eax
-   //"pushl $1\n" // ecx
-   "# save the original edi/esi (into the stack)\n"
+   "pushl $1\n" // eax
+   "pushl $1\n" // ecx
+   "# save the original edi/esi (onto the stack)\n"
    "pushl %edi\n"
    "pushl %esi\n"  // <-- This is the ESP value we want
-   "# save the original return address\n"
+   "# save the original params/return addr on stack\n"
+   "pushl %edx\n"
    "pushl %eax\n"
    "pushl %ecx\n"
    "# save the original esp (into ecx)\n"
    "movl %esp, %ecx\n"
-   "addl $4, %ecx\n" // note that we must move back over return addr
+   "addl $12, %ecx\n"
+   "\n"
    "# save the caller's base pointer (so that LEAVE works)\n"
    "# body begins with base and\n"
    "# stack pointers equal\n"
@@ -182,18 +183,15 @@ asm(
    "call allocate_helper\n"
    "addl $12, %esp\n"
    "\n"
-   "# restores the original base pointer (from stack)\n"
+   "# restore the original base pointer (from stack)\n"
    "leave\n"
-   "# get the original return address from the stack\n"
-   "popl %ecx\n"
-   "popl %edx\n"
+   "# restore the original args and return addr\n"
+   "popl 16(%esp)\n" // this restores the return addr
+   "popl 16(%esp)\n"
+   "popl 16(%esp)\n"
    "# restore the original edi/esi (from the stack)\n"
    "popl %esi\n"
    "popl %edi\n"
-   "# restore the original return address\n"
-   //"popl %edx\n"
-   "pushl %edx\n"
-   "pushl %ecx\n"
    "ret\n" 
 );
 
