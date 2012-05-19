@@ -28,7 +28,7 @@ void print_content(void **in, int depth) {
       printf("...");
       return;
    }
-   // NOTE: this function crashes quite messily if in is 0
+   // NOTE: this function crashes quite messily if "in" is 0
    // so we've added this check
    if(in == NULL) {
       printf("nil");
@@ -39,11 +39,11 @@ void print_content(void **in, int depth) {
       printf("%i", x >> 1);
    } else {
       size= *((int*)in);
-      data = in+1;
+      data = in + 1;
       printf("{s:%i", size);
       for(i=0; i < size; i++) {
          printf(", ");
-         print_content(*data, depth+1);
+         print_content(*data, depth + 1);
          data++;
       }
       printf("}");
