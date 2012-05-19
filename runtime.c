@@ -151,24 +151,19 @@ asm(
    ".globl allocate\n"
    ".type allocate, @function\n"
    "allocate:\n"
-   "# grab the arguments (into eax,edx)\n"
-   "popl %ecx\n"
+   "# grab the arguments (into ecx,edx)\n"
    "popl %eax\n"
+   "popl %ecx\n"
    "popl %edx\n"
-   "# put non-GC values back in their place\n"
-   "pushl $1\n" // edx
-   "pushl $1\n" // eax
-   "pushl $1\n" // ecx
-   "# save the original edi/esi (onto the stack)\n"
-   "pushl %edi\n"
-   "pushl %esi\n"  // <-- This is the ESP value we want
-   "# save the original params/return addr on stack\n"
-   "pushl %edx\n"
-   "pushl %eax\n"
-   "pushl %ecx\n"
-   "# save the original esp (into ecx)\n"
-   "movl %esp, %ecx\n"
-   "addl $12, %ecx\n"
+   "# put the original edi/esi on stack instead of args\n"
+   "pushl %edi\n" // formerly edx
+   "pushl %esi\n" // formerly ecx  <-- this is the ESP we want
+   "pushl %eax\n" // eax
+   "pushl %ecx\n" // ecx
+   "pushl %edx\n" // edx
+   "# save the original esp (into eax)\n"
+   "movl %esp, %eax\n"
+   "addl $4, %eax\n"
    "\n"
    "# save the caller's base pointer (so that LEAVE works)\n"
    "# body begins with base and\n"
@@ -176,22 +171,24 @@ asm(
    "pushl %ebp\n"
    "movl %esp, %ebp\n"
    "# push the first three args on stack\n"
-   "pushl %ecx\n"
-   "pushl %edx\n"
    "pushl %eax\n"
+   "pushl %edx\n"
+   "pushl %ecx\n"
    "# call the real alloc\n"
    "call allocate_helper\n"
    "addl $12, %esp\n"
    "\n"
    "# restore the original base pointer (from stack)\n"
    "leave\n"
-   "# restore the original args and return addr\n"
-   "popl 16(%esp)\n" // this restores the return addr
-   "popl 16(%esp)\n"
-   "popl 16(%esp)\n"
-   "# restore the original edi/esi (from the stack)\n"
-   "popl %esi\n"
-   "popl %edi\n"
+   "# get original argument values\n"
+   "popl %edx\n" // arg 2
+   "popl %ecx\n" // arg 1
+   "# restore esi/edi\n"
+   "movl 4(%esp), %esi\n" // restore esi
+   "movl 8(%esp), %edi\n" // restore edi
+   "# restore original argument values\n"
+   "movl %ecx, 4(%esp)\n"
+   "movl %edx, 8(%esp)\n"
    "ret\n" 
 );
 
