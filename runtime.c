@@ -151,19 +151,17 @@ asm(
    ".globl allocate\n"
    ".type allocate, @function\n"
    "allocate:\n"
-   "# grab the arguments (into ecx,edx)\n"
+   "# grab the arguments (into eax,edx)\n"
+   "popl %ecx\n" // return val
    "popl %eax\n"
-   "popl %ecx\n"
    "popl %edx\n"
    "# put the original edi/esi on stack instead of args\n"
    "pushl %edi\n" // formerly edx
-   "pushl %esi\n" // formerly ecx  <-- this is the ESP we want
-   "pushl %eax\n" // eax
+   "pushl %esi\n" // formerly eax  <-- this is the ESP we want
    "pushl %ecx\n" // ecx
-   "pushl %edx\n" // edx
-   "# save the original esp (into eax)\n"
-   "movl %esp, %eax\n"
-   "addl $12, %eax\n"
+   "# save the original esp (into ecx)\n"
+   "movl %esp, %ecx\n"
+   "addl $4, %ecx\n"
    "\n"
    "# save the caller's base pointer (so that LEAVE works)\n"
    "# body begins with base and\n"
@@ -171,24 +169,22 @@ asm(
    "pushl %ebp\n"
    "movl %esp, %ebp\n"
    "# push the first three args on stack\n"
-   "pushl %eax\n"
-   "pushl %edx\n"
    "pushl %ecx\n"
+   "pushl %edx\n"
+   "pushl %eax\n"
    "# call the real alloc\n"
    "call allocate_helper\n"
    "addl $12, %esp\n"
    "\n"
    "# restore the original base pointer (from stack)\n"
    "leave\n"
-   "# get original argument values\n"
-   "popl %edx\n" // arg 2
-   "popl %ecx\n" // arg 1
-   "# restore esi/edi\n"
-   "movl 4(%esp), %esi\n" // restore esi
-   "movl 8(%esp), %edi\n" // restore edi
-   "# restore original argument values\n"
-   "movl %ecx, 4(%esp)\n"
-   "movl %edx, 8(%esp)\n"
+   "# restore esi/edi from stack\n"
+   "popl %ecx\n" // return val
+   "popl %esi\n" // restore esi
+   "popl %edi\n" // restore edi
+   "pushl $0\n" // formerly arg 2
+   "pushl $0\n" // formerly arg 1
+   "pushl %ecx\n" // put back return val
    "ret\n" 
 );
 
