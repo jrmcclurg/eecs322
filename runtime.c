@@ -157,14 +157,18 @@ asm(
    "popl %edx\n"
    "\n"
    "# (put them back on stack)\n"
-   "pushl %edx\n"
-   "pushl %eax\n"
-   "pushl %ecx\n"
+   "pushl $1\n" // edx
+   //"pushl $1\n" // eax
+   //"pushl $1\n" // ecx
    "# save the original edi/esi (into the stack)\n"
    "pushl %edi\n"
-   "pushl %esi\n"
+   "pushl %esi\n"  // <-- This is the ESP value we want
+   "# save the original return address\n"
+   "pushl %eax\n"
+   "pushl %ecx\n"
    "# save the original esp (into ecx)\n"
    "movl %esp, %ecx\n"
+   "addl $4, %ecx\n" // note that we must move back over return addr
    "# save the caller's base pointer (so that LEAVE works)\n"
    "# body begins with base and\n"
    "# stack pointers equal\n"
@@ -180,9 +184,16 @@ asm(
    "\n"
    "# restores the original base pointer (from stack)\n"
    "leave\n"
+   "# get the original return address from the stack\n"
+   "popl %ecx\n"
+   "popl %edx\n"
    "# restore the original edi/esi (from the stack)\n"
    "popl %esi\n"
    "popl %edi\n"
+   "# restore the original return address\n"
+   //"popl %edx\n"
+   "pushl %edx\n"
+   "pushl %ecx\n"
    "ret\n" 
 );
 
