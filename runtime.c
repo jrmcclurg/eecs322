@@ -108,7 +108,7 @@ int *gc_copy(int *old)  {
  */
 void gc(int *esp) {
    int i;
-   int stack_size = stack - esp;           // calculate the stack size
+   int stack_size = stack - esp + 1;           // calculate the stack size
    int prev_words_alloc = words_allocated;
 
 #ifdef GC_DEBUG
@@ -132,7 +132,7 @@ void gc(int *esp) {
 
    // Then, we need to copy anything pointed at
    // by the stack into our empty heap
-   for(i = 0; i <= stack_size; i++) {
+   for(i = 0; i < stack_size; i++) {
       esp[i] = (int)gc_copy((int*)esp[i]);
    }
 
@@ -179,11 +179,11 @@ asm(
    "# restore the original base pointer (from stack)\n"
    "leave\n"
    "# restore esi/edi from stack\n"
-   "popl %ecx\n" // return val
-   "popl %esi\n" // restore esi
-   "popl %edi\n" // restore edi
-   "pushl $0\n" // formerly arg 2
-   "pushl $0\n" // formerly arg 1
+   "popl %ecx\n"  // return val
+   "popl %esi\n"  // restore esi
+   "popl %edi\n"  // restore edi
+   "pushl $0\n"   // formerly arg 2
+   "pushl $0\n"   // formerly arg 1
    "pushl %ecx\n" // put back return val
    "ret\n" 
 );
@@ -199,20 +199,20 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
              fw_size);
    }
 
-   int dataSize = fw_size >> 1;
+   int data_size = fw_size >> 1;
 
-   if(dataSize < 0) {
-      printf("allocate called with size of %i\n", dataSize);
+   if(data_size < 0) {
+      printf("allocate called with size of %i\n", data_size);
       exit(-1);
    }
 
    // Even if there is no data, allocate an array of two words
    // so we can hold a forwarding pointer and an int representing if
    // the array has already been garbage collected
-   int arraySize = (dataSize == 0) ? 2 : dataSize + 1;
+   int array_size = (data_size == 0) ? 2 : data_size + 1;
 
    // Check if the heap has space for the allocation
-   if(words_allocated + dataSize >= HEAP_SIZE)
+   if(words_allocated + data_size >= HEAP_SIZE)
    {
 #ifdef ENABLE_GC
       // Garbage collect
@@ -220,7 +220,7 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
 #endif
 
       // Check if the garbage collection free enough space for the allocation
-      if(words_allocated + dataSize >= HEAP_SIZE) {
+      if(words_allocated + data_size >= HEAP_SIZE) {
          printf("out of memory\n"); // NOTE: we've added a newline
          exit(-1);
       }
@@ -228,22 +228,19 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
 
    // Do the allocation
    int *ret = allocptr;
-   allocptr += arraySize;
-   words_allocated += arraySize;
+   allocptr += array_size;
+   words_allocated += array_size;
 
    // Set the size of the array to be the desired size
-   ret[0] = dataSize;
+   ret[0] = data_size;
 
    // If there is no data, set the value of the array to be a number
    // so it can be properly garbage collected
-   if(dataSize == 0) {
+   if(data_size == 0) {
       ret[1] = 1;
    } else {
       // Fill the array with the fill value
-      // NOTE: memset does NOT working properly here
-      // (maybe because we need to copy WORDS
-      // rather than just bytes, not really sure)
-      for(i = 0; i < dataSize; i++) {
+      for(i = 0; i < data_size; i++) {
          ret[i+1] = (int)fw_fill;
       }
    }
