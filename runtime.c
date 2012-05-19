@@ -141,9 +141,17 @@ void gc(int *esp) {
 #endif
 }
 
+int c_test(char *one, char *two) {
+   char buffer[128];
+   strcpy(buffer,one);
+   strcat(buffer,two);
+   int result = strlen(buffer);
+   return result;
+}
+
 /*
  * The "allocate" runtime function
- * (assembly stub that calls the 5-argument
+ * (assembly stub that calls the 3-argument
  * allocate_helper function)
  */
 extern void* allocate(int fw_size, void *fw_fill);
@@ -153,12 +161,14 @@ asm(
    "allocate:\n"
    "# grab the arguments (into eax,edx)\n"
    "popl %ecx\n" // return val
-   "popl %eax\n"
-   "popl %edx\n"
+   "popl %eax\n" // arg 1
+   "popl %edx\n" // arg 2
    "# put the original edi/esi on stack instead of args\n"
    "pushl %edi\n" // formerly edx
    "pushl %esi\n" // formerly eax  <-- this is the ESP we want
-   "pushl %ecx\n" // ecx
+   "pushl %ecx\n" // ecx (return val)
+   "pushl %eax\n" // eax (arg 1)
+   "pushl %edx\n" // edx (arg 2)
    "# save the original esp (into ecx)\n"
    "movl %esp, %ecx\n"
    "addl $4, %ecx\n"
@@ -179,12 +189,14 @@ asm(
    "# restore the original base pointer (from stack)\n"
    "leave\n"
    "# restore esi/edi from stack\n"
-   "popl %ecx\n"  // return val
+   "popl %edx\n"  // arg 2
+   "popl %ecx\n"  // arg 1
+   "addl $4, %esp\n" // skip over return val
    "popl %esi\n"  // restore esi
    "popl %edi\n"  // restore edi
-   "pushl $0\n"   // formerly arg 2
-   "pushl $0\n"   // formerly arg 1
-   "pushl %ecx\n" // put back return val
+   "pushl %edx\n" // put back arg 2
+   "pushl %ecx\n" // put back arg 1
+   "subl $4, %esp\n" // put back return val
    "ret\n" 
 );
 
@@ -261,7 +273,6 @@ int print_error(int* array, int fw_x) {
  * Program entry-point
  */
 int main() {
-
    heap = (void*)malloc(HEAP_SIZE*sizeof(void*));
    heap2 = (void*)malloc(HEAP_SIZE*sizeof(void*));
    allocptr = (int*)heap;
