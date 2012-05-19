@@ -171,7 +171,7 @@ asm(
    "pushl %edx\n" // edx (arg 2)
    "# save the original esp (into ecx)\n"
    "movl %esp, %ecx\n"
-   "addl $4, %ecx\n"
+   "addl $12, %ecx\n"
    "\n"
    "# save the caller's base pointer (so that LEAVE works)\n"
    "# body begins with base and\n"
@@ -191,7 +191,7 @@ asm(
    "# restore esi/edi from stack\n"
    "popl %edx\n"  // arg 2
    "popl %ecx\n"  // arg 1
-   "addl $4, %esp\n" // skip over return val
+   "addl $4, %esp\n" // skip over return val (it didn't change)
    "popl %esi\n"  // restore esi
    "popl %edi\n"  // restore edi
    "pushl %edx\n" // put back arg 2
@@ -229,13 +229,15 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
 #ifdef ENABLE_GC
       // Garbage collect
       gc(esp);
-#endif
 
       // Check if the garbage collection free enough space for the allocation
       if(words_allocated + data_size >= HEAP_SIZE) {
+#endif
          printf("out of memory\n"); // NOTE: we've added a newline
          exit(-1);
+#ifdef ENABLE_GC
       }
+#endif
    }
 
    // Do the allocation
@@ -284,8 +286,8 @@ int main() {
       exit(-1);
    }
 
-   // move esp into the bottom-of-stack pointer
-   // the "go" function's boilerplate (as long as one copies it
+   // Move esp into the bottom-of-stack pointer.
+   // The "go" function's boilerplate (as long as one copies it
    // correctly from the lecture notes), in conjunction with
    // the C calling convention dictates that there will be
    // exactly 6 words added to the stack before the
