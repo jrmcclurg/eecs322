@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #define HEAP_SIZE 1048576  // one megabyte
-//#define HEAP_SIZE 10       // small heap size for testing
+//#define HEAP_SIZE 20       // small heap size for testing
 #define ENABLE_GC          // uncomment this to enable GC
 //#define GC_DEBUG           // uncomment this to enable GC debugging
 
@@ -231,6 +231,11 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
    int i, data_size, array_size;
    int *ret;
 
+#ifdef GC_DEBUG
+   printf("runtime.c: allocate(): ESP = %p (%d), EDI = %p (%d), ESI = %p (%d)\n",
+          esp, (int)esp, (int*)esp[1], esp[1], (int*)esp[0], esp[0]);
+#endif
+
    if(!(fw_size & 1)) {
       printf("allocate called with size input that was not an encoded integer, %i\n",
              fw_size);
@@ -326,6 +331,10 @@ int main() {
       :             // inputs (none)
       : "%eax"      // clobbered registers (eax)
    );  
+
+#ifdef GC_DEBUG
+   printf("runtime.c: main(): initial ESP value = %p (%d)\n", stack, (int)stack);
+#endif
 
    return 0;
 }

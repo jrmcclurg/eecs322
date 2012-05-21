@@ -1,0 +1,51 @@
+;; This is for checking that
+;; 1. esi/edi values are put on the stack and located properly by allocate()
+;; 2. esp is obtained correctly by allocate()
+(
+  (
+    ;; set initial edi/esi
+    (edi <- 123)
+    (esi <- 234)
+
+    ;; print edi value
+    (ecx <- edi)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+
+    ;; print esi value
+    (ecx <- esi)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+
+    ;; print esp value
+    (ecx <- esp)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+
+    ;; the ESP value reported by this runtime call
+    ;; should be the above esp value + 2 words
+    ;; (since esi/edi are put on the stack)
+    (eax <- (allocate 21 1))
+
+    ;; print edi value
+    (ecx <- edi)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+
+    ;; print esi value
+    (ecx <- esi)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+    
+    ;; print esp value
+    (ecx <- esp)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+  )
+)
