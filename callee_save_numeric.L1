@@ -1,6 +1,8 @@
-;; Set the heap size to 20b to run this test
-;; This is for checking that
-;; numeric esi/edi values are not modified by garbage collection
+;; This should be run in the L1 compiler...
+;; In runtime.c, set the heap size to 20b and turn on GC_DEBUG to run this test.
+;; This is for checking that numeric esi/edi values are not modified by
+;; garbage collection.  It sets some initial numeric values, does some
+;; allocation (triggering GC), and then prints the final values of edi/esi.
 (
   (
     ;; set initial edi/esi

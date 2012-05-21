@@ -1,7 +1,12 @@
-;; Set the heap size to 20b to run this test
-;; This is for checking that
-;; pointer esi/edi values are updated properly by garbage collection
-;; to reflect their new locations in memory
+;; This should be run in the L1 compiler...
+;; In runtime.c, set the heap size to 20b and turn on GC_DEBUG to run this test
+;; This is for checking that pointer esi/edi values are updated properly by
+;; garbage collection to reflect their new locations in memory.  It allocates
+;; and places pointers in edi/esi, does more allocation (triggering GC), and
+;; then prints the final values (and addresses) of edi/esi.  The values should
+;; be unchanged, but the addresses should be different.  This also shows that
+;; the edi/esi pointers prevent their data from being collected, while the
+;; other six words are collected, as they should be.
 (
   (
     ;; set initial edi/esi

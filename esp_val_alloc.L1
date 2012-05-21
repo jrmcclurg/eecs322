@@ -1,4 +1,6 @@
-;; This is for checking that
+;; This should be used with the L1 compiler.
+;; In runtime.c, the GC_DEBUG mode should be turned on.
+;; This is for checking that:
 ;; 1. esi/edi values are put on the stack and located properly by allocate()
 ;; 2. esp is obtained correctly by allocate()
 (

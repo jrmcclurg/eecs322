@@ -1,7 +1,7 @@
-;; This prints the initial ESP value
-;; use the GC_DEBUG option in runtime.c
-;; to check that this value is equal
-;; to the value found by runtime.c
+;; This should be used with the L1 compiler.
+;; In runtime.c, the GC_DEBUG mode should be enabled.
+;; This prints the initial ESP value.  The runtime
+;; should report an identical value
 (
   (
     (ecx <- esp)
