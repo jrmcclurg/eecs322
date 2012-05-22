@@ -8,7 +8,7 @@
     ;; set initial edi/esi/ebx
     (edi <- 12345)
     (esi <- 34567)
-    (esi <- 45678)
+    (ebx <- 45678)
 
     ;; print edi value
     (ecx <- edi)
