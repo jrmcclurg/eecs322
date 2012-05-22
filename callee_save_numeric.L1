@@ -5,9 +5,10 @@
 ;; allocation (triggering GC), and then prints the final values of edi/esi.
 (
   (
-    ;; set initial edi/esi
+    ;; set initial edi/esi/ebx
     (edi <- 12345)
     (esi <- 34567)
+    (esi <- 45678)
 
     ;; print edi value
     (ecx <- edi)
@@ -21,6 +22,12 @@
     (ecx += 1)
     (eax <- (print ecx))
 
+    ;; print ebx value
+    (ecx <- ebx)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+
     (eax <- (allocate 19 1))
     (eax <- (allocate 19 1))
     (eax <- (allocate 19 1))
@@ -33,6 +40,12 @@
 
     ;; print esi value
     (ecx <- esi)
+    (ecx *= 2)
+    (ecx += 1)
+    (eax <- (print ecx))
+
+    ;; print ebx value
+    (ecx <- ebx)
     (ecx *= 2)
     (ecx += 1)
     (eax <- (print ecx))
