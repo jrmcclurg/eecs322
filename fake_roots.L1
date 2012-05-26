@@ -1,0 +1,31 @@
+;; run with 20b heap size
+;; This demonstrates the case where the stack contains
+;; a user-specified value which happens to equal a heap
+;; address during GC
+(
+  (
+    (esp -= 12)
+    (esi <- 0)
+    (edi <- 1000000000)
+    (eax <- (allocate 13 edi))
+    ((mem ebp -4) <- eax)
+    (eax <- (allocate 15 edi))
+    ((mem ebp -12) <- eax)
+:begin
+(cjump 1000 < edi :cont :done)
+:cont
+(edi -= 4)
+((mem ebp -8) <- edi)
+(edi *= 2)
+(edi += 1)
+(eax <- (allocate 1 3))
+(eax <- (mem ebp -4))
+;(eax <- (print edi))
+(edi >>= 1)
+(goto :begin)
+:done
+(edi <- 1000000000)
+(esi <- 0)
+    (esp += 12)
+  )
+)
