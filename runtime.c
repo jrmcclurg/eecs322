@@ -173,7 +173,9 @@ int *gc_copy(int *old)  {
 void gc(int *esp) {
    int i;
    int stack_size = stack - esp + 1;       // calculate the stack size
+#ifdef GC_DEBUG
    int prev_words_alloc = heap.words_allocated;
+#endif
 
 #ifdef GC_DEBUG
    printf("GC: stack=(%p,%p) (size %d): ", esp, stack, stack_size);
