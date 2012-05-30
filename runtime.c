@@ -73,7 +73,6 @@ void print_content(void **in, int depth) {
    }
 }
 
-
 /*
  * Runtime "print" function
  */
@@ -367,7 +366,6 @@ int print_error(int *array, int fw_x) {
           fw_x >> 1, *array);
    exit(0);
 }
-
 
 /*
  * Program entry-point
