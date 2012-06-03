@@ -17,6 +17,11 @@
  * 2. similarly, immediately before a call to
  *    allocate(), the stack should not contain
  *    unencoded numeric values
+ * 3. the boilerplate for the "go" function
+ *    should appear exactly as listed in the
+ *    lecture notes (that is, exactly 5 things
+ *    should be pushed onto the stack before
+ *    the body of the function)
  */
 #include <string.h>
 #include <stdlib.h>
@@ -299,7 +304,8 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
 
 #ifdef GC_DEBUG
    //printf("runtime.c: allocate(%d,%d (%p)) @ %p: ESP = %p (%d), EDI = %p (%d), ESI = %p (%d), EBX = %p (%d)\n",
-   //       data_size, (int)fw_fill, fw_fill, heap.allocptr, esp, (int)esp, (int*)esp[2], esp[2], (int*)esp[1], esp[1], (int*)esp[0], esp[0]);
+   //       data_size, (int)fw_fill, fw_fill, heap.allocptr, esp, (int)esp, (int*)esp[2], esp[2],
+   //       (int*)esp[1], esp[1], (int*)esp[0], esp[0]);
    //fflush(stdout);
 #endif
 
@@ -342,17 +348,12 @@ void* allocate_helper(int fw_size, void *fw_fill, int *esp)
    if(data_size == 0) {
       ret[1] = 1;
       valid[1] = 0;
-      //printf(" set %p to 1\n", &ret[1]);
-      //fflush(stdout);
    } else {
       // Fill the array with the fill value
       for(i = 1; i < array_size; i++) {
          ret[i] = (int)fw_fill;
          valid[i] = 0;
-         //printf(" set %p to %d (%p)", &ret[i], fw_fill, fw_fill);
       }
-      //printf("\n");
-      //fflush(stdout);
    }
 
    return ret;
@@ -373,9 +374,7 @@ int print_error(int *array, int fw_x) {
 int main() {
    int b1 = alloc_heap(&heap);
    int b2 = alloc_heap(&heap2);
-   // NOTE: allocptr needs to appear in the following check, because otherwise
-   // gcc apparently optimizes away the assignment (i.e. the allocate_helper function
-   // sees allocptr as NULL)
+
    if(!b1 || !b2) {
       printf("malloc failed\n");
       exit(-1);
@@ -396,7 +395,7 @@ int main() {
         "call go;"
       : "=m"(stack) // outputs
       :             // inputs (none)
-      : "%eax", "%ebx", "%edi", "%esi" // clobbered registers (eax)
+      : "%eax", "%ebx", "%edi", "%esi" // clobbered registers (eax & callee-saves)
    );  
 
 #ifdef GC_DEBUG
