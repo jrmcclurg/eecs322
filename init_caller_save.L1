@@ -1,0 +1,15 @@
+(
+   (
+      (edi <- ecx)
+      (esi <- edx)
+      (eax *= 2)
+      (eax += 1)
+      (eax <- (print eax))
+      (edi *= 2)
+      (edi += 1)
+      (eax <- (print edi))
+      (esi *= 2)
+      (esi += 1)
+      (eax <- (print esi))
+   )
+)
