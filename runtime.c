@@ -90,7 +90,7 @@ int print(void *l) {
       :             // outputs (none)
       :             // inputs (none)
       : "%ecx", "%edx" // clobbered registers (caller-saves, except return val EAX)
-   );  
+   );
 
    return 1;
 }
